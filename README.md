@@ -2,15 +2,15 @@
 
 Launch your AI CLI TUI tools from the VS Code Activity Bar.
 
-Agent TUI Bar is a small VS Code extension for people who already use terminal-first coding agents such as Codex, Claude Code, OpenCode, and Pi. It does not replace those tools or wrap them in a custom chat UI. It gives them a focused launcher inside VS Code, opens them in the integrated terminal, and helps you copy file or selection references when you want to bring code context into the TUI.
+Agent TUI Bar is a small VS Code extension for people who already use terminal-first coding agents such as Codex, Claude Code, OpenCode, Pi, and MimoCode. It does not replace those tools or wrap them in a custom chat UI. It gives them a focused launcher inside VS Code, opens them in the integrated terminal, and helps you copy file or selection references when you want to bring code context into the TUI.
 
 ## Features
 
 - One-click launchers in the Activity Bar.
-- Built-in launchers for Codex, Claude Code, OpenCode, and Pi.
+- Built-in launchers for Codex, Claude Code, OpenCode, Pi, and MimoCode.
 - Opens CLI TUI sessions in the editor area by default, so they behave like tabs.
 - Optional terminal panel mode if you prefer the traditional bottom terminal.
-- Custom launchers through VS Code settings.
+- Custom launchers through the sidebar manager or VS Code settings.
 - Editor context menu actions for copying the current file or selected code as a reference.
 - Explorer context menu action for copying selected file references.
 - Remote-aware execution for WSL, SSH, and Dev Containers.
@@ -23,13 +23,14 @@ Agent TUI Bar is a small VS Code extension for people who already use terminal-f
 | Claude Code | `claude` |
 | OpenCode | `opencode` |
 | Pi | `pi` |
+| MimoCode | `mimo` |
 
 The extension starts these commands in VS Code's integrated terminal. Install and authenticate each CLI tool separately before launching it from Agent TUI Bar.
 
 ## Usage
 
 1. Open the `Agent TUI Bar` icon in the Activity Bar.
-2. Click `Codex`, `Claude Code`, `OpenCode`, or `Pi`.
+2. Click `Codex`, `Claude Code`, `OpenCode`, `Pi`, or `MimoCode`.
 3. The CLI TUI opens in the editor area by default.
 
 You can also right-click in the editor or Explorer to copy references:
@@ -56,7 +57,7 @@ File references use this format:
 
 ## Configuration
 
-Add custom launchers in your VS Code settings:
+Add custom launchers with `Agent TUI Bar: Manage Launchers` from the Launchers view title, or edit your VS Code settings directly:
 
 ```json
 {
@@ -67,7 +68,6 @@ Add custom launchers in your VS Code settings:
       "command": "my-agent",
       "args": ["--project", "${workspaceFolder}"],
       "cwd": "${workspaceFolder}",
-      "icon": "terminal",
       "env": {
         "MY_AGENT_MODE": "tui"
       }
@@ -87,7 +87,6 @@ Supported launcher fields:
 | `command` | Yes | CLI command to run. |
 | `args` | No | Command arguments. |
 | `cwd` | No | Working directory. Defaults to `${workspaceFolder}`. |
-| `icon` | No | VS Code ThemeIcon id, such as `terminal`, `hubot`, `rocket`, or `sparkle`. |
 | `env` | No | Environment variables passed to the terminal. |
 
 Supported variables in `command`, `args`, `cwd`, and `env`:
@@ -139,7 +138,7 @@ Available template variables:
 
 Agent TUI Bar is declared as a workspace extension. In WSL, SSH, and Dev Container windows, install or enable the extension in the remote workspace so launchers execute in that remote environment.
 
-This is important because commands such as `codex`, `claude`, `opencode`, and `pi` must exist on the same machine where the terminal is created.
+This is important because commands such as `codex`, `claude`, `opencode`, `pi`, and `mimo` must exist on the same machine where the terminal is created.
 
 ## Development
 
