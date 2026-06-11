@@ -10,7 +10,6 @@ interface LauncherConfig {
   command: string;
   args?: string[];
   cwd?: string;
-  icon?: string;
   env?: Record<string, string>;
 }
 
@@ -20,32 +19,35 @@ const defaultLaunchers: LauncherConfig[] = [
     label: "Codex",
     command: "codex",
     args: [],
-    cwd: "${workspaceFolder}",
-    icon: "terminal"
+    cwd: "${workspaceFolder}"
   },
   {
     id: "claude",
     label: "Claude Code",
     command: "claude",
     args: [],
-    cwd: "${workspaceFolder}",
-    icon: "hubot"
+    cwd: "${workspaceFolder}"
   },
   {
     id: "opencode",
     label: "OpenCode",
     command: "opencode",
     args: [],
-    cwd: "${workspaceFolder}",
-    icon: "code"
+    cwd: "${workspaceFolder}"
   },
   {
     id: "pi",
     label: "Pi",
     command: "pi",
     args: [],
-    cwd: "${workspaceFolder}",
-    icon: "rocket"
+    cwd: "${workspaceFolder}"
+  },
+  {
+    id: "mimocode",
+    label: "MimoCode",
+    command: "mimo",
+    args: [],
+    cwd: "${workspaceFolder}"
   }
 ];
 
@@ -55,7 +57,6 @@ class LauncherItem extends vscode.TreeItem {
     this.id = launcher.id;
     this.description = launcher.command;
     this.tooltip = `${launcher.label}: ${buildDisplayCommand(launcher)}`;
-    this.iconPath = new vscode.ThemeIcon(launcher.icon || "terminal");
     this.command = {
       command: "agentTuiBar.launchLauncher",
       title: "Launch Agent",
@@ -89,6 +90,7 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.window.registerTreeDataProvider("agentTuiBar.launchers", provider),
     vscode.commands.registerCommand("agentTuiBar.refreshLaunchers", () => provider.refresh()),
+    vscode.commands.registerCommand("agentTuiBar.manageLaunchers", () => manageLaunchers(provider)),
     vscode.commands.registerCommand("agentTuiBar.launchLauncher", (launcher?: LauncherConfig | LauncherItem) =>
       launchAgent(resolveLauncherArgument(launcher))
     ),
@@ -118,9 +120,7 @@ export function deactivate(): void {
 }
 
 function getLaunchers(): LauncherConfig[] {
-  const configured = vscode.workspace
-    .getConfiguration("agentTuiBar")
-    .get<LauncherConfig[]>("launchers", []);
+  const configured = getConfiguredLaunchers();
   const merged = new Map(defaultLaunchers.map((launcher) => [launcher.id, launcher]));
 
   for (const launcher of configured) {
@@ -134,7 +134,6 @@ function getLaunchers(): LauncherConfig[] {
       ...launcher,
       args: launcher.args || existing?.args || [],
       cwd: launcher.cwd || existing?.cwd || "${workspaceFolder}",
-      icon: launcher.icon || existing?.icon || "terminal",
       env: launcher.env || existing?.env || {}
     });
   }
@@ -149,6 +148,287 @@ function isUsableLauncher(launcher: unknown): launcher is LauncherConfig {
 
   const candidate = launcher as Partial<LauncherConfig>;
   return Boolean(candidate.id && candidate.label && candidate.command);
+}
+
+function getConfiguredLaunchers(): LauncherConfig[] {
+  return vscode.workspace
+    .getConfiguration("agentTuiBar")
+    .get<LauncherConfig[]>("launchers", [])
+    .filter(isUsableLauncher)
+    .map(normalizeLauncher);
+}
+
+function normalizeLauncher(launcher: LauncherConfig): LauncherConfig {
+  return {
+    id: launcher.id,
+    label: launcher.label,
+    command: launcher.command,
+    args: launcher.args || [],
+    cwd: launcher.cwd || "${workspaceFolder}",
+    env: launcher.env || {}
+  };
+}
+
+async function manageLaunchers(provider: LaunchersProvider): Promise<void> {
+  const action = await vscode.window.showQuickPick(
+    [
+      { label: "Add Launcher", description: "Create a custom launcher" },
+      { label: "Edit Launcher", description: "Override or update a launcher" },
+      { label: "Delete Launcher", description: "Remove a custom launcher or built-in override" }
+    ],
+    {
+      placeHolder: "Manage Agent TUI launchers"
+    }
+  );
+
+  if (!action) {
+    return;
+  }
+
+  if (action.label === "Add Launcher") {
+    await addLauncher(provider);
+    return;
+  }
+
+  if (action.label === "Edit Launcher") {
+    await editLauncher(provider);
+    return;
+  }
+
+  await deleteLauncher(provider);
+}
+
+async function addLauncher(provider: LaunchersProvider): Promise<void> {
+  const launcher = await promptForLauncher();
+  if (!launcher) {
+    return;
+  }
+
+  const configured = getConfiguredLaunchers();
+  const existingIndex = configured.findIndex((item) => item.id === launcher.id);
+
+  if (existingIndex >= 0 || defaultLaunchers.some((item) => item.id === launcher.id)) {
+    const overwrite = await vscode.window.showWarningMessage(
+      `Launcher "${launcher.id}" already exists. Overwrite it?`,
+      { modal: true },
+      "Overwrite"
+    );
+
+    if (overwrite !== "Overwrite") {
+      return;
+    }
+  }
+
+  await saveLauncher(launcher);
+  provider.refresh();
+  vscode.window.showInformationMessage(`Saved launcher "${launcher.label}".`);
+}
+
+async function editLauncher(provider: LaunchersProvider): Promise<void> {
+  const selected = await pickLauncher("Select a launcher to edit");
+  if (!selected) {
+    return;
+  }
+
+  const launcher = await promptForLauncher(selected);
+  if (!launcher) {
+    return;
+  }
+
+  if (launcher.id !== selected.id && getLaunchers().some((item) => item.id === launcher.id)) {
+    const overwrite = await vscode.window.showWarningMessage(
+      `Launcher "${launcher.id}" already exists. Overwrite it?`,
+      { modal: true },
+      "Overwrite"
+    );
+
+    if (overwrite !== "Overwrite") {
+      return;
+    }
+  }
+
+  await saveLauncher(launcher, selected.id);
+  provider.refresh();
+  vscode.window.showInformationMessage(`Saved launcher "${launcher.label}".`);
+}
+
+async function deleteLauncher(provider: LaunchersProvider): Promise<void> {
+  const selected = await pickLauncher("Select a launcher to delete");
+  if (!selected) {
+    return;
+  }
+
+  const configured = getConfiguredLaunchers();
+  const existingIndex = configured.findIndex((item) => item.id === selected.id);
+
+  if (existingIndex < 0) {
+    vscode.window.showInformationMessage(`"${selected.label}" is built in and has no custom override to delete.`);
+    return;
+  }
+
+  const remove = await vscode.window.showWarningMessage(
+    `Remove custom settings for "${selected.label}"?`,
+    { modal: true },
+    "Remove"
+  );
+
+  if (remove !== "Remove") {
+    return;
+  }
+
+  configured.splice(existingIndex, 1);
+  await updateConfiguredLaunchers(configured);
+  provider.refresh();
+  vscode.window.showInformationMessage(`Removed custom settings for "${selected.label}".`);
+}
+
+async function pickLauncher(placeHolder: string): Promise<LauncherConfig | undefined> {
+  const configuredIds = new Set(getConfiguredLaunchers().map((launcher) => launcher.id));
+  const items = getLaunchers().map((launcher) => ({
+    label: launcher.label,
+    description: launcher.command,
+    detail: configuredIds.has(launcher.id) ? "Custom" : "Built in",
+    launcher
+  }));
+  const selected = await vscode.window.showQuickPick(items, { placeHolder });
+  return selected?.launcher;
+}
+
+async function promptForLauncher(existing?: LauncherConfig): Promise<LauncherConfig | undefined> {
+  const label = await promptForRequiredString("Launcher name", existing?.label);
+  if (label === undefined) {
+    return undefined;
+  }
+
+  const id = await promptForRequiredString("Launcher id", existing?.id || toLauncherId(label), validateLauncherId);
+  if (id === undefined) {
+    return undefined;
+  }
+
+  const command = await promptForRequiredString("Command", existing?.command);
+  if (command === undefined) {
+    return undefined;
+  }
+
+  const argsInput = await vscode.window.showInputBox({
+    title: "Arguments",
+    prompt: "Space-separated arguments. Variables like ${workspaceFolder} are supported.",
+    value: (existing?.args || []).join(" ")
+  });
+  if (argsInput === undefined) {
+    return undefined;
+  }
+
+  const cwd = await vscode.window.showInputBox({
+    title: "Working directory",
+    prompt: "Supports ${workspaceFolder}, ${fileDirname}, ${file}, and ${relativeFile}.",
+    value: existing?.cwd || "${workspaceFolder}"
+  });
+  if (cwd === undefined) {
+    return undefined;
+  }
+
+  const envInput = await vscode.window.showInputBox({
+    title: "Environment variables",
+    prompt: "JSON object, for example {\"MY_AGENT_MODE\":\"tui\"}.",
+    value: JSON.stringify(existing?.env || {}),
+    validateInput: validateEnvJson
+  });
+  if (envInput === undefined) {
+    return undefined;
+  }
+
+  return normalizeLauncher({
+    id: id.trim(),
+    label: label.trim(),
+    command: command.trim(),
+    args: splitArgs(argsInput),
+    cwd: cwd || "${workspaceFolder}",
+    env: parseEnvJson(envInput)
+  });
+}
+
+async function promptForRequiredString(
+  title: string,
+  value?: string,
+  validateInput?: (value: string) => string | undefined
+): Promise<string | undefined> {
+  const input = await vscode.window.showInputBox({
+    title,
+    value,
+    validateInput: (input) => {
+      if (!input.trim()) {
+        return `${title} is required.`;
+      }
+
+      return validateInput?.(input.trim());
+    }
+  });
+
+  return input?.trim();
+}
+
+async function saveLauncher(launcher: LauncherConfig, previousId = launcher.id): Promise<void> {
+  const configured = getConfiguredLaunchers();
+  const withoutPrevious = configured.filter((item) => item.id !== previousId && item.id !== launcher.id);
+  withoutPrevious.push(launcher);
+  await updateConfiguredLaunchers(withoutPrevious);
+}
+
+async function updateConfiguredLaunchers(launchers: LauncherConfig[]): Promise<void> {
+  const target = vscode.workspace.workspaceFolders?.length
+    ? vscode.ConfigurationTarget.Workspace
+    : vscode.ConfigurationTarget.Global;
+  await vscode.workspace.getConfiguration("agentTuiBar").update("launchers", launchers, target);
+}
+
+function validateLauncherId(value: string): string | undefined {
+  if (!/^[A-Za-z0-9._-]+$/.test(value)) {
+    return "Use only letters, numbers, dots, underscores, and hyphens.";
+  }
+
+  return undefined;
+}
+
+function validateEnvJson(value: string): string | undefined {
+  try {
+    parseEnvJson(value);
+    return undefined;
+  } catch (error) {
+    return error instanceof Error ? error.message : "Invalid JSON object.";
+  }
+}
+
+function parseEnvJson(value: string): Record<string, string> {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return {};
+  }
+
+  const parsed = JSON.parse(trimmed) as unknown;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Enter a JSON object.");
+  }
+
+  for (const [key, item] of Object.entries(parsed)) {
+    if (typeof item !== "string") {
+      throw new Error(`Environment variable "${key}" must be a string.`);
+    }
+  }
+
+  return parsed as Record<string, string>;
+}
+
+function splitArgs(value: string): string[] {
+  return value.trim() ? value.trim().split(/\s+/) : [];
+}
+
+function toLauncherId(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 
 function resolveLauncherArgument(launcher?: LauncherConfig | LauncherItem): LauncherConfig | undefined {

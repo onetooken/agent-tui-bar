@@ -2,7 +2,7 @@
   "name": "agent-tui-bar",
   "displayName": "Agent TUI Bar",
   "description": "A lightweight launcher for AI CLI TUI tools in the VS Code terminal.",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "onetoken",
   "license": "MIT",
   "repository": {
@@ -28,7 +28,8 @@
     "onCommand:agentTuiBar.copyCurrentFileReference",
     "onCommand:agentTuiBar.copySelectionReference",
     "onCommand:agentTuiBar.copyExplorerSelectionReferences",
-    "onCommand:agentTuiBar.refreshLaunchers"
+    "onCommand:agentTuiBar.refreshLaunchers",
+    "onCommand:agentTuiBar.manageLaunchers"
   ],
   "main": "./dist/extension.js",
   "scripts": {
@@ -84,14 +85,24 @@
         "command": "agentTuiBar.refreshLaunchers",
         "title": "Agent TUI Bar: Refresh Launchers",
         "icon": "$(refresh)"
+      },
+      {
+        "command": "agentTuiBar.manageLaunchers",
+        "title": "Agent TUI Bar: Manage Launchers",
+        "icon": "$(settings-gear)"
       }
     ],
     "menus": {
       "view/title": [
         {
+          "command": "agentTuiBar.manageLaunchers",
+          "when": "view == agentTuiBar.launchers",
+          "group": "navigation@1"
+        },
+        {
           "command": "agentTuiBar.refreshLaunchers",
           "when": "view == agentTuiBar.launchers",
-          "group": "navigation"
+          "group": "navigation@2"
         }
       ],
       "editor/context": [
@@ -150,11 +161,6 @@
                 "type": "string",
                 "default": "${workspaceFolder}",
                 "description": "Working directory. Supports ${workspaceFolder}, ${fileDirname}, ${file}, and ${relativeFile}."
-              },
-              "icon": {
-                "type": "string",
-                "default": "terminal",
-                "description": "VS Code ThemeIcon id, for example terminal, hubot, rocket, sparkle."
               },
               "env": {
                 "type": "object",
