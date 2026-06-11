@@ -1,0 +1,202 @@
+{
+  "name": "agent-tui-bar",
+  "displayName": "Agent TUI Bar",
+  "description": "A lightweight launcher for AI CLI TUI tools in the VS Code terminal.",
+  "version": "0.0.1",
+  "publisher": "onetoken",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/onetooken/agent-tui-bar.git"
+  },
+  "bugs": {
+    "url": "https://github.com/onetooken/agent-tui-bar/issues"
+  },
+  "homepage": "https://github.com/onetooken/agent-tui-bar",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "extensionKind": [
+    "workspace"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:agentTuiBar.launchers",
+    "onCommand:agentTuiBar.launchLauncher",
+    "onCommand:agentTuiBar.copyCurrentFileReference",
+    "onCommand:agentTuiBar.copySelectionReference",
+    "onCommand:agentTuiBar.copyExplorerSelectionReferences",
+    "onCommand:agentTuiBar.refreshLaunchers"
+  ],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.8",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.5.2"
+  },
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agentTuiBar",
+          "title": "Agent TUI Bar",
+          "icon": "resources/agent-tui-bar.svg"
+        }
+      ]
+    },
+    "views": {
+      "agentTuiBar": [
+        {
+          "id": "agentTuiBar.launchers",
+          "name": "Launchers"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "agentTuiBar.launchLauncher",
+        "title": "Agent TUI Bar: Launch Agent",
+        "icon": "$(terminal)"
+      },
+      {
+        "command": "agentTuiBar.copyCurrentFileReference",
+        "title": "Agent TUI Bar: Copy Current File Reference",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "agentTuiBar.copySelectionReference",
+        "title": "Agent TUI Bar: Copy Selection Reference",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "agentTuiBar.copyExplorerSelectionReferences",
+        "title": "Agent TUI Bar: Copy Explorer Selection References",
+        "icon": "$(copy)"
+      },
+      {
+        "command": "agentTuiBar.refreshLaunchers",
+        "title": "Agent TUI Bar: Refresh Launchers",
+        "icon": "$(refresh)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "agentTuiBar.refreshLaunchers",
+          "when": "view == agentTuiBar.launchers",
+          "group": "navigation"
+        }
+      ],
+      "editor/context": [
+        {
+          "command": "agentTuiBar.copySelectionReference",
+          "group": "navigation@20"
+        },
+        {
+          "command": "agentTuiBar.copyCurrentFileReference",
+          "group": "navigation@21"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "agentTuiBar.copyExplorerSelectionReferences",
+          "group": "navigation@20"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Agent TUI Bar",
+      "properties": {
+        "agentTuiBar.launchers": {
+          "type": "array",
+          "default": [],
+          "description": "Custom CLI TUI launchers. Items with the same id override built-in launchers.",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "label",
+              "command"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Stable launcher id."
+              },
+              "label": {
+                "type": "string",
+                "description": "Display name shown in the Agent TUI Bar view."
+              },
+              "command": {
+                "type": "string",
+                "description": "CLI command to run."
+              },
+              "args": {
+                "type": "array",
+                "default": [],
+                "description": "Arguments passed to the CLI command.",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "cwd": {
+                "type": "string",
+                "default": "${workspaceFolder}",
+                "description": "Working directory. Supports ${workspaceFolder}, ${fileDirname}, ${file}, and ${relativeFile}."
+              },
+              "icon": {
+                "type": "string",
+                "default": "terminal",
+                "description": "VS Code ThemeIcon id, for example terminal, hubot, rocket, sparkle."
+              },
+              "env": {
+                "type": "object",
+                "default": {},
+                "description": "Environment variables for the terminal.",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "agentTuiBar.terminal.reuse": {
+          "type": "boolean",
+          "default": false,
+          "description": "Reuse an existing terminal for the same launcher instead of creating a new one."
+        },
+        "agentTuiBar.terminal.cwdMode": {
+          "type": "string",
+          "enum": [
+            "workspace",
+            "fileDirectory",
+            "custom"
+          ],
+          "default": "workspace",
+          "description": "Default working-directory mode for launching CLI TUI tools."
+        },
+        "agentTuiBar.terminal.location": {
+          "type": "string",
+          "enum": [
+            "editor",
+            "panel"
+          ],
+          "default": "editor",
+          "description": "Where launched CLI TUI terminals open. Use editor to open them in the editor area, or panel to open them in the bottom terminal panel."
+        },
+        "agentTuiBar.reference.template": {
+          "type": "string",
+          "default": "${relativePath}:${startLine}-${endLine}\n\n```${language}\n${text}\n```",
+          "description": "Template used when copying a selected code reference."
+        }
+      }
+    }
+  }
+}
